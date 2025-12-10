@@ -2,6 +2,9 @@ import { BrowserWindow, ipcMain, screen } from "electron";
 import { useStore } from "../store";
 import lyricWindow from "../windows/lyric-window";
 import mainWindow from "../windows/main-window";
+import { updateTaskbarLyricTooltip } from "../taskbar-lyric";
+import type { TaskbarLyricState } from "../taskbar-lyric";
+import type { LyricData } from "../../../src/types/desktop-lyric";
 
 /**
  * 歌词相关 IPC
@@ -12,6 +15,14 @@ const initLyricIpc = (): void => {
   // 歌词窗口
   let lyricWin: BrowserWindow | null = null;
 
+  // 任务栏歌词状态
+  const taskbarLyricState: TaskbarLyricState = {
+    lrcData: [],
+    yrcData: [],
+    lyricIndex: -1,
+  };
+  let taskbarSongId: number | undefined;
+
   /**
    * 窗口是否存活
    * @param win 窗口实例
@@ -19,6 +30,28 @@ const initLyricIpc = (): void => {
    */
   const isWinAlive = (win: BrowserWindow | null): win is BrowserWindow =>
     !!win && !win.isDestroyed();
+
+  /**
+   * 更新任务栏歌词 Tooltip
+   */
+  const updateTaskbarTooltip = (data: LyricData) => {
+    if (!data) return;
+    // 歌曲切换时重置索引
+    if (typeof data.songId === "number" && data.songId !== taskbarSongId) {
+      taskbarSongId = data.songId;
+      taskbarLyricState.lyricIndex = -1;
+    }
+    // 更新基础信息
+    if (typeof data.playName === "string") taskbarLyricState.playName = data.playName;
+    if (typeof data.artistName === "string") taskbarLyricState.artistName = data.artistName;
+    if (typeof data.playStatus === "boolean") taskbarLyricState.playStatus = data.playStatus;
+    // 更新歌词数据
+    if (Array.isArray(data.lrcData)) taskbarLyricState.lrcData = data.lrcData;
+    if (Array.isArray(data.yrcData)) taskbarLyricState.yrcData = data.yrcData;
+    if (typeof data.lyricIndex === "number") taskbarLyricState.lyricIndex = data.lyricIndex;
+
+    updateTaskbarLyricTooltip(mainWindow.getWin(), taskbarLyricState);
+  };
 
   // 切换桌面歌词
   ipcMain.on("toggle-desktop-lyric", (_event, val: boolean) => {
@@ -50,9 +83,12 @@ const initLyricIpc = (): void => {
   });
 
   // 更新歌词窗口数据
-  ipcMain.on("update-desktop-lyric-data", (_, lyricData) => {
-    if (!lyricData || !isWinAlive(lyricWin)) return;
-    lyricWin.webContents.send("update-desktop-lyric-data", lyricData);
+  ipcMain.on("update-desktop-lyric-data", (_, lyricData: LyricData) => {
+    if (!lyricData) return;
+    if (isWinAlive(lyricWin)) {
+      lyricWin.webContents.send("update-desktop-lyric-data", lyricData);
+    }
+    updateTaskbarTooltip(lyricData);
   });
 
   // 更新歌词窗口配置
@@ -76,14 +112,19 @@ const initLyricIpc = (): void => {
 
   // 播放状态更改
   ipcMain.on("play-status-change", (_, status) => {
-    if (!isWinAlive(lyricWin)) return;
-    lyricWin.webContents.send("update-desktop-lyric-data", { playStatus: status });
+    if (isWinAlive(lyricWin)) {
+      lyricWin.webContents.send("update-desktop-lyric-data", { playStatus: status });
+    }
+    updateTaskbarTooltip({ playStatus: status });
   });
 
   // 音乐歌词更改
-  ipcMain.on("play-lyric-change", (_, lyricData) => {
-    if (!lyricData || !isWinAlive(lyricWin)) return;
-    lyricWin.webContents.send("update-desktop-lyric-data", lyricData);
+  ipcMain.on("play-lyric-change", (_, lyricData: LyricData) => {
+    if (!lyricData) return;
+    if (isWinAlive(lyricWin)) {
+      lyricWin.webContents.send("update-desktop-lyric-data", lyricData);
+    }
+    updateTaskbarTooltip(lyricData);
   });
 
   // 获取窗口位置
