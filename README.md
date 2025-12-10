@@ -192,6 +192,10 @@ docker run -d --name SPlayer -p 25884:25884 imsyy/splayer:latest
 
 6. 点击 `Deploy`，即可成功部署
 
+## ⚙️ 本地构建 Windows 客户端
+
+想在本地体验带有 Windows 11 任务栏歌词的新版本，可参考 [docs/BUILD_CLIENT.md](./docs/BUILD_CLIENT.md) 获取详细的环境、配置与打包步骤。
+
 ## ⚙️ 服务器部署
 
 1. 重复 `⚙️ Vercel 部署` 中的 1 - 4 步骤
